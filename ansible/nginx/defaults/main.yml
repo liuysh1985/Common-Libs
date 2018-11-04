@@ -1,0 +1,19 @@
+ngx_version: "1.12.2"
+ngx_install_path: "/opt"
+ngx_log_path: "/var/log/nginx"
+ngx_ulimit_params:
+  nofile: "262144"
+  nproc: "32768"
+# ngx_local_package_path: "/path/to/nginx/package"
+ngx_remote_package_path: "{{packages_server}}/packages/nginx-{{ngx_version}}.tar.gz"
+ngx_dependencies:
+  - gd
+  - libxml2
+  - libxslt
+  - GeoIP
+  - pcre
+  - gperftools
+  - perl-ExtUtils-Embed
+  - openssl
+# whether to enable the Prometheus Nginx Exporter
+ngx_exporter_enable: false

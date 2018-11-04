@@ -1,0 +1,37 @@
+#jinja2:lstrip_blocks: True
+user  nginx;
+worker_processes  {{ ansible_processor_cores }};
+
+error_log  {{ ngx_log_path }}/error.log;
+
+pid        /run/nginx.pid;
+
+events {
+    worker_connections  {{ 2048*ansible_processor_cores }};
+}
+
+http {
+{%if ngx_exporter_enable%}
+    geoip_country /usr/share/GeoIP/GeoIP.dat;
+    vhost_traffic_status_zone;
+    vhost_traffic_status_filter_by_set_key $geoip_country_code country::*;
+{%endif%}
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '[$time_local] $http_host $remote_addr "$request" '
+                      '$status $request_time $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for" $upstream_addr $upstream_status $upstream_response_time';
+
+    access_log     off;
+    server_tokens  off;
+
+    sendfile       on;
+    tcp_nopush     on;
+
+    keepalive_timeout  0;
+
+    gzip  on;
+
+    include {{ngx_install_path}}/nginx/conf.d/*.conf;
+}

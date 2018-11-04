@@ -1,0 +1,76 @@
+- name: "Create user and group for nginx"
+  group: name=nginx state=present
+- user:
+    name: nginx
+    group: nginx
+    create_home: no
+    shell: "/sbin/nologin"
+    state: present
+- name: Set PAM limits params for nginx user
+  pam_limits:
+    domain: "nginx"
+    limit_type: "-"
+    limit_item: "{{item.key}}"
+    value: "{{item.value}}"
+    dest: "/etc/security/limits.d/nginx.conf"
+  with_dict: "{{ngx_ulimit_params}}"
+- name: Install dependencies
+  yum:
+    name: "{{item}}"
+    state: latest
+  with_items: "{{ngx_dependencies}}"
+- name: Installation and Configuration.
+  file: path={{ngx_install_path}} state=directory
+- file: path={{ngx_log_path}} owner=nginx group=nginx state=directory mode=0755
+- unarchive:
+    src: "{{ngx_local_package_path}}"
+    dest: "{{ngx_install_path}}"
+    owner: nginx
+    group: nginx
+    keep_newer: yes
+  when: ngx_local_package_path is defined
+- block:
+    - name: Download nginx package once.
+      get_url:
+        url: "{{ngx_remote_package_path}}"
+        dest: "/tmp/nginx-{{ngx_version}}.tar.gz"
+        force: yes
+      register: ngx_pkg_temp_local
+      run_once: yes
+      delegate_to: 127.0.0.1
+    - unarchive:
+        src: "{{ngx_pkg_temp_local.dest}}"
+        dest: "{{ngx_install_path}}"
+        owner: nginx
+        group: nginx
+        keep_newer: yes
+  when: ngx_local_package_path is not defined
+- file:
+    src: "{{ngx_install_path}}/nginx-{{ngx_version}}"
+    path: "{{ngx_install_path}}/nginx"
+    force: yes
+    state: link
+- name: Distribute default nginx configuration files to target hosts.
+  template:
+    src: "templates/nginx.service.j2"
+    dest: "/usr/lib/systemd/system/nginx.service"
+    force: yes
+- template:
+    src: "templates/nginx.conf.j2"
+    dest: "{{ngx_install_path}}/nginx/conf/nginx.conf"
+    force: yes
+  notify:
+    - restart nginx service
+- name: Distribute logrotate config for nginx
+  template:
+    src: "templates/nginx_logrotate.j2"
+    dest: "/etc/logrotate.d/nginx"
+    force: yes
+- name: Enable nginx service is running.
+  service:
+    name: nginx
+    state: started
+    daemon_reload: yes
+    enabled: yes
+- include_tasks: exporter.yml
+  when: ngx_exporter_enable
